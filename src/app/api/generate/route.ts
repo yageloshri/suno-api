@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { cookies } from 'next/headers'
+import { cookies } from 'next/headers';
 import { DEFAULT_MODEL, sunoApi } from "@/lib/SunoApi";
 import { corsHeaders } from "@/lib/utils";
 
@@ -11,10 +11,8 @@ export async function POST(req: NextRequest) {
       const body = await req.json();
       const { prompt, make_instrumental, model, wait_audio } = body;
 
-      // הוסף בדיקה כדי לוודא שהקוקי קיים
-      const cookieHeader = cookies().toString();
-      if (!cookieHeader) {
-        return new NextResponse(JSON.stringify({ error: "Missing authentication cookie" }), {
+      if (!prompt) {
+        return new NextResponse(JSON.stringify({ error: "Missing required parameter: prompt" }), {
           status: 400,
           headers: {
             'Content-Type': 'application/json',
@@ -23,19 +21,9 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const apiInstance = await sunoApi(cookieHeader);
-
-      if (!apiInstance) {
-        return new NextResponse(JSON.stringify({ error: "Failed to initialize Suno API" }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        });
-      }
-
-      const audioInfo = await apiInstance.generate(
+      const cookieStore = cookies();
+      const sunoInstance = await sunoApi(cookieStore.toString());
+      const audioInfo = await sunoInstance.generate(
         prompt,
         Boolean(make_instrumental),
         model || DEFAULT_MODEL,
@@ -49,12 +37,11 @@ export async function POST(req: NextRequest) {
           ...corsHeaders
         }
       });
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating custom audio:', error);
 
       return new NextResponse(JSON.stringify({
-        error: `Internal server error: ${error.message || "Unknown error"}`
+        error: `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}`
       }), {
         status: 500,
         headers: {
